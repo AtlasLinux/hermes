@@ -61,7 +61,7 @@ String read_line(void) {
             case BACKSPACE:
                 printf("\b \b");
                 fflush(NULL);
-                buffer.len--;
+                if(buffer.len > 0) buffer.len--;
                 break;
             default:
                 buffer.chars[buffer.len++] = (char)c;
