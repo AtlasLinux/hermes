@@ -1,0 +1,154 @@
+#include <termios.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+
+#define BUFFER_MAX_SIZE 1024
+#define PARSE_TOKEN_DELIM " \t"
+#define PROMPT "> "
+
+const char* name;
+
+struct termios orig_termios;
+
+void disableRawMode(void) {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
+void enableRawMode(void) {
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    atexit(disableRawMode);
+
+    struct termios raw = orig_termios;
+    raw.c_lflag &= ~(ECHO | ICANON | ISIG);
+    raw.c_iflag &= ~(IXON | ICRNL);        
+    raw.c_oflag &= ~(OPOST);               
+
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
+
+typedef enum chars {
+    ENTER = 13,
+    BACKSPACE = 127,
+    CTRL_D = 4,
+} chars_t;
+
+typedef struct String {
+    char* chars;
+    int len;
+} String;
+
+String read_line(void) {
+    chars_t c;
+    String buffer = { .chars = malloc(BUFFER_MAX_SIZE), .len = 0 };
+    if (!buffer.chars) {
+        perror(name);
+        exit(1);
+    }
+
+    while (read(STDIN_FILENO, &c, 1) == 1 && c != ENTER) {
+        switch (c) {
+            case CTRL_D:
+                if (buffer.len == 0) {
+                    printf("\n\r");
+                    exit(SIGINT);
+                }
+                break;
+            case BACKSPACE:
+                printf("\b \b");
+                fflush(NULL);
+                buffer.len--;
+                break;
+            default:
+                buffer.chars[buffer.len++] = (char)c;
+                printf("%c", c);
+                fflush(stdout);
+                break;
+        }
+        if (buffer.len >= BUFFER_MAX_SIZE - 1) break;
+    }
+    buffer.chars[buffer.len] = '\0';
+    return buffer;
+}
+
+int parse_line(String line, String **out) {
+    char *token = strtok(line.chars, PARSE_TOKEN_DELIM);
+    String *buffer = malloc(sizeof(String) * BUFFER_MAX_SIZE);
+    if (!buffer) {
+        perror(name);
+        exit(1);
+    }
+    int i = 0;
+
+    while (token != NULL) {
+        buffer[i].chars = token;
+        buffer[i].len = strlen(token);
+        token = strtok(NULL, PARSE_TOKEN_DELIM);
+        i++;
+    }
+
+    *out = buffer;
+    return i;
+}
+
+char **to_argv(String *args, int count) {
+    char **argv = malloc((count + 1) * sizeof(char *));
+    if (!argv) {
+        perror(name);
+        exit(1);
+    }
+    for (int i = 0; i < count; i++) {
+        argv[i] = args[i].chars;
+    }
+    argv[count] = NULL;
+    return argv;
+}
+
+void launch(String *args, int argc) {
+    pid_t pid = fork();
+    if (pid == -1) {
+        perror(name);
+        return;
+    }
+    if (pid == 0) {
+        char **argv = to_argv(args, argc);
+        execvp(argv[0], argv);
+        perror(name);
+        exit(1);
+    } else {
+        wait(NULL);
+    }
+}
+
+int main(int argc, char** argv) {
+    
+    name = argv[0];
+
+    while (1) {
+        printf(PROMPT);
+        fflush(NULL);
+
+        enableRawMode();
+
+        String line = read_line();
+
+        printf("\n\r");
+        fflush(NULL);
+
+        String *args;
+        int argc = parse_line(line, &args);
+        if (argc > 0) {
+            disableRawMode();
+            launch(args, argc);
+        }
+
+        free(line.chars);
+        free(args);
+    }
+
+    return 0;
+}
