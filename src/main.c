@@ -1,18 +1,49 @@
 #include "globals.h"
 #include "builtins/cd.h"
 #include "builtins/exit.h"
+#include "builtins/echo.h"
 
 const char* name = "hermes";
 struct termios orig_termios;
 
+static char PROMPT[MAX_LINE] = "\r";
+
+void load_config(const char *path) {
+    FILE *file = fopen(path, "r");
+    if (!file) {
+        fprintf(stderr, "Failed to open config file: %s: %s\n", path, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    char line[MAX_LINE];
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\r\n")] = '\0';
+
+        if (line[0]=='\0' || line[0]=='#') continue;
+        char *eq = strchr(line, '=');
+        if (!eq) continue;
+
+        *eq = '\0';
+        char *key = line;
+        char *val = eq + 1;
+
+        if (strcmp(key, "PROMPT") == 0) {
+            strncat(PROMPT, val, MAX_LINE-1);
+        }
+    }
+    fclose(file);
+}
+
 char* builtin_str[] = {
     "cd",
-    "exit"
+    "exit",
+    "echo",
 };
 
 int (*builtin_func[]) (String*) = {
     &builtin_cd,
     &builtin_exit,
+    &builtin_echo,
 };
 
 void disableRawMode(void) {
@@ -139,6 +170,11 @@ int parse_line(String line, String **out) {
     int i = 0;
 
     while (token != NULL) {
+        switch (token[0]) {
+            case '$':
+                token = getenv(token + 1);
+                break;
+        }
         buffer[i].chars = token;
         buffer[i].len = strlen(token);
         token = strtok(NULL, PARSE_TOKEN_DELIM);
@@ -203,7 +239,7 @@ int execute(String* args, int argc) {
 }
 
 int main(int argc, char** argv) {
-    
+    load_config(CONFIG_FILE);
     name = argv[0];
 
     int status = 0;

@@ -11,11 +11,13 @@
 #include <signal.h>
 #include <dirent.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #define BUFFER_MAX_SIZE 1024
+#define MAX_LINE 512
 #define PARSE_TOKEN_DELIM " \t"
-#define PROMPT "\r> "
 #define HERMES_SUCCESS 1
+#define CONFIG_FILE "/home/gingrspacecadet/hermes.conf"
 
 extern const char* name;
 
