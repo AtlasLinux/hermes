@@ -9,7 +9,7 @@ OBJ = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRC))
 
 TARGET = build/hermes
 
-.PHONY: all clean run
+.PHONY: all clean run crun
 
 all: $(TARGET)
 
@@ -29,3 +29,5 @@ clean:
 
 run: all
 	@./$(TARGET)
+
+crun: clean run

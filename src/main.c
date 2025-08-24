@@ -77,7 +77,7 @@ String handle_tab(String buffer) {
     printf("\n\r");
     if (d) {
         while ((dir = readdir(d)) != NULL) {
-            if (strstr(dir->d_name, buffer.chars)) {
+            if (strncmp(dir->d_name, buffer.chars, buffer.len) == 0) {
                 if (i == cap) {
                     cap *= 2;
                     dirs = realloc(dirs, cap * sizeof(*dirs));
@@ -99,6 +99,7 @@ String handle_tab(String buffer) {
 
         if (i == 1) {
             buffer.chars = dirs[0].chars;
+            buffer.len = strlen(dirs[0].chars);
             return buffer;
         } else {
             for (int j = 0; j < i; j++) {

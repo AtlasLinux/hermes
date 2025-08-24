@@ -13,13 +13,16 @@
 #include <stdbool.h>
 #include <errno.h>
 
-#define BUFFER_MAX_SIZE 1024
-#define MAX_LINE 512
 #define PARSE_TOKEN_DELIM " \t"
 #define HERMES_SUCCESS 1
 #define CONFIG_FILE "/home/gingrspacecadet/hermes.conf"
 
 extern const char* name;
+
+typedef const enum sizes {
+    BUFFER_MAX_SIZE = 1024,
+    MAX_LINE = 512,
+} sizes_t;
 
 typedef enum chars {
     ENTER = 13,
