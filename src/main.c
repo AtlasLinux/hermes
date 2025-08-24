@@ -1,7 +1,5 @@
 #include "globals.h"
-#include "builtins/cd.h"
-#include "builtins/exit.h"
-#include "builtins/echo.h"
+#include "builtins.h"
 
 const char* name = "hermes";
 struct termios orig_termios;
@@ -140,14 +138,14 @@ String read_line(void) {
             case BACKSPACE:
                 if (buffer.len > 0) {
                     printf("\b \b");
-                    fflush(NULL);
+                    fflush(stdout);
                     buffer.chars[--buffer.len] = '\0';
                 }
                 break;
             case TAB:
                 buffer = handle_tab(buffer);
                 printf("\n\r%s%s", PROMPT, buffer.chars);
-                fflush(NULL);
+                fflush(stdout);
                 break;
             default:
                 buffer.chars[buffer.len++] = (char)c;
@@ -243,17 +241,17 @@ int main(int argc, char** argv) {
     load_config(CONFIG_FILE);
     name = argv[0];
 
-    int status = 0;
+    int status;
     while (true) {
         printf(PROMPT);
-        fflush(NULL);
+        fflush(stdout);
 
         enableRawMode();
 
         String line = read_line();
 
         printf("\n\r");
-        fflush(NULL);
+        fflush(stdout);
 
         String *args;
         int argc = parse_line(line, &args);

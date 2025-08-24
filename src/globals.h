@@ -15,6 +15,7 @@
 
 #define PARSE_TOKEN_DELIM " \t"
 #define HERMES_SUCCESS 1
+#define HERMES_FAILURE 0
 #define CONFIG_FILE "/home/gingrspacecadet/hermes.conf"
 
 extern const char* name;
