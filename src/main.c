@@ -1,20 +1,19 @@
-#include <termios.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <dirent.h>
+#include "globals.h"
+#include "builtins/cd.h"
+#include "builtins/exit.h"
 
-#define BUFFER_MAX_SIZE 1024
-#define PARSE_TOKEN_DELIM " \t"
-#define PROMPT "> "
-
-const char* name;
-
+const char* name = "hermes";
 struct termios orig_termios;
+
+char* builtin_str[] = {
+    "cd",
+    "exit"
+};
+
+int (*builtin_func[]) (String*) = {
+    &builtin_cd,
+    &builtin_exit,
+};
 
 void disableRawMode(void) {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
@@ -31,18 +30,6 @@ void enableRawMode(void) {
 
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
-
-typedef enum chars {
-    ENTER = 13,
-    BACKSPACE = 127,
-    CTRL_D = 4,
-    TAB = 9,
-} chars_t;
-
-typedef struct String {
-    char* chars;
-    int len;
-} String;
 
 String handle_tab(String buffer) {
     DIR *d;
@@ -98,6 +85,7 @@ String handle_tab(String buffer) {
     free(dirs);
 
     fflush(stdout);
+    return buffer;
 }
 
 String read_line(void) {
@@ -174,27 +162,52 @@ char **to_argv(String *args, int count) {
     return argv;
 }
 
-void launch(String *args, int argc) {
-    pid_t pid = fork();
-    if (pid == -1) {
-        perror(name);
-        return;
-    }
+int num_builtins(void) {
+    return sizeof(builtin_str) / sizeof(char*);
+}
+
+int launch(String *args, int argc) {
+    pid_t pid, wpid;
+    int status;
+
+    pid = fork();
     if (pid == 0) {
         char **argv = to_argv(args, argc);
-        execvp(argv[0], argv);
+        if (execvp(argv[0], argv) == -1) {
+            perror(name);
+        }
+        exit(EXIT_FAILURE);
+    } else if (pid < 0) {
         perror(name);
-        exit(1);
     } else {
-        wait(NULL);
+        do {
+            wpid = waitpid(pid, &status, WUNTRACED);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
     }
+
+    return EXIT_FAILURE;
+}
+
+int execute(String* args, int argc) {
+    if (args[0].chars == NULL) {
+        return 1;
+    }
+
+    for (int i = 0; i < num_builtins(); i++) {
+        if (strcmp(args[0].chars, builtin_str[i]) == 0) {
+            return (*builtin_func[i])(args);
+        }
+    }
+
+    return launch(args, argc);
 }
 
 int main(int argc, char** argv) {
     
     name = argv[0];
 
-    while (1) {
+    int status = 0;
+    while (true) {
         printf(PROMPT);
         fflush(NULL);
 
@@ -209,7 +222,7 @@ int main(int argc, char** argv) {
         int argc = parse_line(line, &args);
         if (argc > 0) {
             disableRawMode();
-            launch(args, argc);
+            status = execute(args, argc);
         }
 
         free(line.chars);
