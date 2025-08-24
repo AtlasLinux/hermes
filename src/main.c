@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <dirent.h>
 
 #define BUFFER_MAX_SIZE 1024
 #define PARSE_TOKEN_DELIM " \t"
@@ -35,6 +36,7 @@ typedef enum chars {
     ENTER = 13,
     BACKSPACE = 127,
     CTRL_D = 4,
+    TAB = 9,
 } chars_t;
 
 typedef struct String {
@@ -42,9 +44,26 @@ typedef struct String {
     int len;
 } String;
 
+void handle_tab(String buffer) {
+    DIR* d;
+    struct dirent *dir;
+    d = opendir(".");
+    printf("\n\r");
+    fflush(NULL);
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            if (strstr(dir->d_name, buffer.chars)) {
+                printf("%s\t", dir->d_name);
+                fflush(NULL);
+            }
+        }
+        closedir(d);
+    }
+}
+
 String read_line(void) {
     chars_t c;
-    String buffer = { .chars = malloc(BUFFER_MAX_SIZE), .len = 0 };
+    String buffer = { .chars = calloc(BUFFER_MAX_SIZE, sizeof(char)), .len = 0};
     if (!buffer.chars) {
         perror(name);
         exit(1);
@@ -55,17 +74,24 @@ String read_line(void) {
             case CTRL_D:
                 if (buffer.len == 0) {
                     printf("\n\r");
+                    disableRawMode();
                     exit(SIGINT);
                 }
                 break;
             case BACKSPACE:
-                printf("\b \b");
-                fflush(NULL);
-                buffer.len--;
+                if (buffer.len > 0) {
+                    printf("\b \b");
+                    fflush(NULL);
+                    buffer.len--;
+                }
                 break;
+            case TAB:
+                handle_tab(buffer);
+                buffer.chars[buffer.len] = '\0';
+                return buffer;
             default:
                 buffer.chars[buffer.len++] = (char)c;
-                printf("%c", c);
+                printf("\r%s%s", PROMPT, buffer.chars);
                 fflush(stdout);
                 break;
         }
