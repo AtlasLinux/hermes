@@ -44,20 +44,60 @@ typedef struct String {
     int len;
 } String;
 
-void handle_tab(String buffer) {
-    DIR* d;
+String handle_tab(String buffer) {
+    DIR *d;
     struct dirent *dir;
+    int i = 0;
+    int cap = 16;
+    String *dirs = malloc(cap * sizeof(*dirs));
+    if (!dirs) {
+        perror(name);
+        exit(EXIT_FAILURE);
+    }
+
     d = opendir(".");
     printf("\n\r");
     if (d) {
         while ((dir = readdir(d)) != NULL) {
             if (strstr(dir->d_name, buffer.chars)) {
-                printf("%s\t", dir->d_name);
+                if (i == cap) {
+                    cap *= 2;
+                    dirs = realloc(dirs, cap * sizeof(*dirs));
+                    if (!dirs) {
+                        perror(name);
+                        closedir(d);
+                        exit(EXIT_FAILURE);
+                    }
+                }
+                dirs[i].chars = strdup(dir->d_name);
+                if (!dirs[i].chars) {
+                    perror(name);
+                    closedir(d);
+                    exit(EXIT_FAILURE);
+                }
+                i++;
+            }
+        }
+
+        if (i == 1) {
+            buffer.chars = dirs[0].chars;
+            return buffer;
+        } else {
+            for (int j = 0; j < i; j++) {
+                printf("%s\t", dirs[j].chars);
             }
         }
         closedir(d);
+        return buffer;
     }
-    fflush(NULL);
+
+    // cleanup
+    for (int j = 0; j < i; j++) {
+        free(dirs[j].chars);
+    }
+    free(dirs);
+
+    fflush(stdout);
 }
 
 String read_line(void) {
@@ -85,7 +125,7 @@ String read_line(void) {
                 }
                 break;
             case TAB:
-                handle_tab(buffer);
+                buffer = handle_tab(buffer);
                 printf("\n\r%s%s", PROMPT, buffer.chars);
                 fflush(NULL);
                 break;
