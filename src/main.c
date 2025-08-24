@@ -49,16 +49,15 @@ void handle_tab(String buffer) {
     struct dirent *dir;
     d = opendir(".");
     printf("\n\r");
-    fflush(NULL);
     if (d) {
         while ((dir = readdir(d)) != NULL) {
             if (strstr(dir->d_name, buffer.chars)) {
                 printf("%s\t", dir->d_name);
-                fflush(NULL);
             }
         }
         closedir(d);
     }
+    fflush(NULL);
 }
 
 String read_line(void) {
@@ -82,13 +81,14 @@ String read_line(void) {
                 if (buffer.len > 0) {
                     printf("\b \b");
                     fflush(NULL);
-                    buffer.len--;
+                    buffer.chars[--buffer.len] = '\0';
                 }
                 break;
             case TAB:
                 handle_tab(buffer);
-                buffer.chars[buffer.len] = '\0';
-                return buffer;
+                printf("\n\r%s%s", PROMPT, buffer.chars);
+                fflush(NULL);
+                break;
             default:
                 buffer.chars[buffer.len++] = (char)c;
                 printf("\r%s%s", PROMPT, buffer.chars);
