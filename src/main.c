@@ -128,6 +128,31 @@ String read_line(void) {
 
     while (read(STDIN_FILENO, &c, 1) == 1 && c != ENTER) {
         switch (c) {
+            case ESCAPE:
+                read(STDIN_FILENO, &c, 1);
+                switch (c) {
+                    case '[':
+                        read(STDIN_FILENO, &c, 1);
+                        switch (c) {
+                            case UP:
+                                printf("\033[A");
+                                fflush(stdout);
+                                break;
+                            case DOWN:
+                                printf("\033[B");
+                                fflush(stdout);
+                                break;
+                            case RIGHT:
+                                printf("\033[C");
+                                fflush(stdout);
+                                break;
+                            case LEFT:
+                                printf("\033[D");
+                                fflush(stdout);
+                                break;
+                        }
+                }
+                break;
             case CTRL_D:
                 if (buffer.len == 0) {
                     printf("\n\r");

@@ -26,10 +26,15 @@ typedef const enum sizes {
 } sizes_t;
 
 typedef enum chars {
-    ENTER = 13,
-    BACKSPACE = 127,
     CTRL_D = 4,
     TAB = 9,
+    ENTER = 13,
+    ESCAPE = 27,
+    UP = 65,
+    DOWN = 66,
+    RIGHT = 67,
+    LEFT = 68,
+    BACKSPACE = 127,
 } chars_t;
 
 typedef struct String {
