@@ -1,13 +1,12 @@
 #include "builtins.h"
 
 int builtin_export(String* args) {
-    
+    setenv(strtok(args[1].chars, "="), strstr(args[1].chars, "=") + 1, true);
     return HERMES_SUCCESS;
 }
 
 int builtin_exit(String* args) {
-    exit(EXIT_FAILURE);
-    return EXIT_FAILURE;
+    exit(EXIT_SUCCESS);
 }
 
 int builtin_echo(String* args) {

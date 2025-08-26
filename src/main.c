@@ -36,12 +36,14 @@ char* builtin_str[] = {
     "cd",
     "exit",
     "echo",
+    "export",
 };
 
 int (*builtin_func[]) (String*) = {
     &builtin_cd,
     &builtin_exit,
     &builtin_echo,
+    &builtin_export,
 };
 
 void disableRawMode(void) {
@@ -72,10 +74,11 @@ String handle_tab(String buffer) {
     }
 
     d = opendir(".");
+    struct stat sb;
     printf("\n\r");
     if (d) {
         while ((dir = readdir(d)) != NULL) {
-            if (strncmp(dir->d_name, buffer.chars, buffer.len) == 0) {
+            if (strncmp(dir->d_name, buffer.chars, buffer.len) == 0 && stat(dir->d_name, &sb) == 0 && sb.st_mode & S_IXUSR) {
                 if (i == cap) {
                     cap *= 2;
                     dirs = realloc(dirs, cap * sizeof(*dirs));
@@ -185,7 +188,7 @@ String read_line(void) {
 }
 
 int parse_line(String line, String **out) {
-    char *token = strtok(line.chars, PARSE_TOKEN_DELIM);
+    String token = { .chars = strtok(line.chars, PARSE_TOKEN_DELIM), .len = strlen(token.chars) };
     String *buffer = malloc(sizeof(String) * BUFFER_MAX_SIZE);
     if (!buffer) {
         perror(name);
@@ -193,15 +196,15 @@ int parse_line(String line, String **out) {
     }
     int i = 0;
 
-    while (token != NULL) {
-        switch (token[0]) {
+    while (token.chars != NULL) {
+        switch (token.chars[0]) {
             case '$':
-                token = getenv(token + 1);
+                token.chars = getenv(token.chars + 1);
                 break;
         }
-        buffer[i].chars = token;
-        buffer[i].len = strlen(token);
-        token = strtok(NULL, PARSE_TOKEN_DELIM);
+        buffer[i].chars = token.chars;
+        buffer[i].len = token.len;
+        token.chars = strtok(NULL, PARSE_TOKEN_DELIM);
         i++;
     }
 

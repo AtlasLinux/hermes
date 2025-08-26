@@ -1,6 +1,7 @@
 {
     "files.associations": {
-        "echo.h": "c"
+        "echo.h": "c",
+        "builtins.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
