@@ -27,3 +27,13 @@ int builtin_cd(String* args) {
     }
     return HERMES_SUCCESS;
 }
+
+int builtin_help(String* args) {
+    puts("Welcome to Hermes Shell\n"
+        "The following commands are built in:\n"
+        "\tcd\n"
+        "\texit\n"
+        "\techo\n"
+        "\texport\n");
+    return HERMES_SUCCESS;
+}

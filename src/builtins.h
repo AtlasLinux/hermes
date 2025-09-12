@@ -7,5 +7,6 @@ int builtin_export(String* args);
 int builtin_exit(String* args);
 int builtin_echo(String* args);
 int builtin_cd(String* args);
+int builtin_help(String* args);
 
 #endif

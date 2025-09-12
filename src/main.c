@@ -4,7 +4,7 @@
 const char* name = "hermes";
 struct termios orig_termios;
 
-static char PROMPT[MAX_LINE] = "\r";
+static char PROMPT[MAX_LINE] = "\r$ ";
 
 void load_config(const char *path) {
     FILE *file = fopen(path, "r");
@@ -37,6 +37,7 @@ char* builtin_str[] = {
     "exit",
     "echo",
     "export",
+    "help",
 };
 
 int (*builtin_func[]) (String*) = {
@@ -44,6 +45,7 @@ int (*builtin_func[]) (String*) = {
     &builtin_exit,
     &builtin_echo,
     &builtin_export,
+    &builtin_help,
 };
 
 void disableRawMode(void) {
@@ -266,7 +268,10 @@ int execute(String* args, int argc) {
 }
 
 int main(int argc, char** argv) {
-    load_config(CONFIG_FILE);
+    if (access(CONFIG_FILE, F_OK) == 0) {
+        load_config(CONFIG_FILE);
+    }
+
     name = argv[0];
 
     int status;
