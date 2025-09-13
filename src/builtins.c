@@ -37,3 +37,8 @@ int builtin_help(String* args) {
         "\texport\n");
     return HERMES_SUCCESS;
 }
+
+int builtin_clear(String* args) {
+    puts("\033[2J\033[H");
+    return HERMES_SUCCESS;
+}

@@ -8,5 +8,6 @@ int builtin_exit(String* args);
 int builtin_echo(String* args);
 int builtin_cd(String* args);
 int builtin_help(String* args);
+int builtin_clear(String* args);
 
 #endif

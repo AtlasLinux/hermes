@@ -38,6 +38,7 @@ char* builtin_str[] = {
     "echo",
     "export",
     "help",
+    "clear",
 };
 
 int (*builtin_func[]) (String*) = {
@@ -46,6 +47,7 @@ int (*builtin_func[]) (String*) = {
     &builtin_echo,
     &builtin_export,
     &builtin_help,
+    &builtin_clear,
 };
 
 void disableRawMode(void) {
