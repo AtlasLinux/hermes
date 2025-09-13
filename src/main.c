@@ -1,5 +1,6 @@
 #include "globals.h"
 #include "builtins.h"
+#include <unistd.h>
 
 const char* name = "hermes";
 struct termios orig_termios;
@@ -277,7 +278,10 @@ int main(int argc, char** argv) {
     name = argv[0];
 
     int status;
+    printf("\x1b[2J");
     while (true) {
+	printf("\x1b[H\x1b[90B"); fflush(stdout);
+
         printf(PROMPT);
         fflush(stdout);
 
@@ -285,7 +289,7 @@ int main(int argc, char** argv) {
 
         String line = read_line();
 
-        printf("\n\r");
+        printf("\x1b[2J\x1b[H");
         fflush(stdout);
 
         String *args;
