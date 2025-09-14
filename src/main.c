@@ -1,5 +1,6 @@
 #include "globals.h"
 #include "builtins.h"
+#include <string.h>
 #include <unistd.h>
 
 const char* name = "hermes";
@@ -40,6 +41,7 @@ char* builtin_str[] = {
     "export",
     "help",
     "clear",
+    "fish"
 };
 
 int (*builtin_func[]) (String*) = {
@@ -49,6 +51,7 @@ int (*builtin_func[]) (String*) = {
     &builtin_export,
     &builtin_help,
     &builtin_clear,
+    &builtin_fish
 };
 
 int num_builtins(void) {

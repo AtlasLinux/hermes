@@ -1,4 +1,5 @@
 #include "builtins.h"
+#include "globals.h"
 
 int builtin_export(String* args) {
     setenv(strtok(args[1].chars, "="), strstr(args[1].chars, "=") + 1, true);
@@ -7,6 +8,15 @@ int builtin_export(String* args) {
 
 int builtin_exit(String* args) {
     exit(EXIT_SUCCESS);
+}
+
+int builtin_fish(String* args) {
+    printf("  /---\\   /| \n");
+    printf(" /@   -__/ |  \n");
+    printf(" \\    /--/\\|\n");
+    printf("  ---/        \n");
+    fflush(stdout);
+    return HERMES_SUCCESS;
 }
 
 int builtin_echo(String* args) {
