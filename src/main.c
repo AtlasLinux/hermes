@@ -67,61 +67,146 @@ void enableRawMode(void) {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
+#include <limits.h>
+#include <sys/stat.h>
+
 String handle_tab(String buffer) {
-    DIR *d;
-    struct dirent *dir;
-    int i = 0;
-    int cap = 16;
-    String *dirs = malloc(cap * sizeof(*dirs));
-    if (!dirs) {
+    int cap = 16, count = 0;
+    String *matches = malloc(cap * sizeof(*matches));
+    if (!matches) {
         perror(name);
         exit(EXIT_FAILURE);
     }
 
-    d = opendir(".");
-    struct stat sb;
     printf("\n\r");
-    if (d) {
-        while ((dir = readdir(d)) != NULL) {
-            if (strncmp(dir->d_name, buffer.chars, buffer.len) == 0 && stat(dir->d_name, &sb) == 0 && sb.st_mode & S_IXUSR) {
-                if (i == cap) {
+
+    // Determine current token
+    char *last_space = strrchr(buffer.chars, ' ');
+    char *token_start = last_space ? last_space + 1 : buffer.chars;
+    size_t token_len = strlen(token_start);
+
+    // Determine first command (first token)
+    char *first_space = strchr(buffer.chars, ' ');
+    size_t first_len = first_space ? (size_t)(first_space - buffer.chars) : buffer.len;
+    char first_cmd[BUFFER_MAX_SIZE];
+    strncpy(first_cmd, buffer.chars, first_len);
+    first_cmd[first_len] = '\0';
+
+    int complete_dirs_only = strcmp(first_cmd, "cd") == 0;
+
+    int first_token = !last_space;
+
+    if (first_token) {
+        // Complete builtins + executables in PATH
+        for (int b = 0; b < num_builtins(); b++) {
+            if (strncmp(builtin_str[b], token_start, token_len) == 0) {
+                if (count == cap) {
                     cap *= 2;
-                    dirs = realloc(dirs, cap * sizeof(*dirs));
-                    if (!dirs) {
+                    matches = realloc(matches, cap * sizeof(*matches));
+                    if (!matches) {
                         perror(name);
-                        closedir(d);
                         exit(EXIT_FAILURE);
                     }
                 }
-                dirs[i].chars = strdup(dir->d_name);
-                if (!dirs[i].chars) {
-                    perror(name);
-                    closedir(d);
-                    exit(EXIT_FAILURE);
+                matches[count].chars = strdup(builtin_str[b]);
+                count++;
+            }
+        }
+
+        char *path_env = getenv("PATH");
+        if (path_env) {
+            char *path_copy = strdup(path_env);
+            if (!path_copy) { perror(name); exit(EXIT_FAILURE); }
+
+            for (char *dirp = strtok(path_copy, ":"); dirp; dirp = strtok(NULL, ":")) {
+                DIR *d = opendir(dirp);
+                if (!d) continue;
+
+                struct dirent *de;
+                while ((de = readdir(d)) != NULL) {
+                    if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+                        continue;
+
+                    if (strncmp(de->d_name, token_start, token_len) == 0) {
+                        char fullpath[PATH_MAX];
+                        snprintf(fullpath, sizeof(fullpath), "%s/%s", dirp, de->d_name);
+                        if (access(fullpath, X_OK) == 0) {
+                            if (count == cap) {
+                                cap *= 2;
+                                matches = realloc(matches, cap * sizeof(*matches));
+                                if (!matches) { perror(name); closedir(d); free(path_copy); exit(EXIT_FAILURE); }
+                            }
+                            matches[count].chars = strdup(de->d_name);
+                            count++;
+                        }
+                    }
                 }
-                i++;
+                closedir(d);
             }
+            free(path_copy);
         }
+    } else {
+        // Complete filenames / directories in CWD
+        DIR *d = opendir(".");
+        if (d) {
+            struct dirent *de;
+            while ((de = readdir(d)) != NULL) {
+                if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+                    continue;
 
-        if (i == 1) {
-            buffer.chars = dirs[0].chars;
-            buffer.len = strlen(dirs[0].chars);
-            return buffer;
-        } else {
-            for (int j = 0; j < i; j++) {
-                printf("%s\t", dirs[j].chars);
+                if (strncmp(de->d_name, token_start, token_len) == 0) {
+                    char fullpath[PATH_MAX];
+                    snprintf(fullpath, sizeof(fullpath), "./%s", de->d_name);
+
+                    struct stat sb;
+                    if (stat(fullpath, &sb) == -1) continue;
+
+                    if (complete_dirs_only && !S_ISDIR(sb.st_mode)) continue;
+
+                    if (count == cap) {
+                        cap *= 2;
+                        matches = realloc(matches, cap * sizeof(*matches));
+                        if (!matches) { perror(name); closedir(d); exit(EXIT_FAILURE); }
+                    }
+
+                    // add trailing / if directory
+                    if (S_ISDIR(sb.st_mode)) {
+                        size_t len = strlen(de->d_name);
+                        char *with_slash = malloc(len + 2);
+                        strcpy(with_slash, de->d_name);
+                        with_slash[len] = '/';
+                        with_slash[len+1] = '\0';
+                        matches[count].chars = with_slash;
+                    } else {
+                        matches[count].chars = strdup(de->d_name);
+                    }
+                    count++;
+                }
             }
+            closedir(d);
         }
-        closedir(d);
-        return buffer;
     }
 
-    // cleanup
-    for (int j = 0; j < i; j++) {
-        free(dirs[j].chars);
-    }
-    free(dirs);
+    if (count == 1) {
+        // Replace token in buffer
+        size_t pre_len = token_start - buffer.chars;
+        size_t new_len = pre_len + strlen(matches[0].chars);
+        char *new_buf = malloc(new_len + 1);
+        memcpy(new_buf, buffer.chars, pre_len);
+        strcpy(new_buf + pre_len, matches[0].chars);
+        new_buf[new_len] = '\0';
 
+        free(buffer.chars);
+        buffer.chars = new_buf;
+        buffer.len = new_len;
+    } else if (count > 1) {
+        for (int i = 0; i < count; i++) {
+            printf("%s\t", matches[i].chars);
+        }
+    }
+
+    for (int i = 0; i < count; i++) free(matches[i].chars);
+    free(matches);
     fflush(stdout);
     return buffer;
 }
