@@ -51,6 +51,10 @@ int (*builtin_func[]) (String*) = {
     &builtin_clear,
 };
 
+int num_builtins(void) {
+    return sizeof(builtin_str) / sizeof(char*);
+}
+
 void disableRawMode(void) {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
@@ -313,10 +317,6 @@ char **to_argv(String *args, int count) {
     }
     argv[count] = NULL;
     return argv;
-}
-
-int num_builtins(void) {
-    return sizeof(builtin_str) / sizeof(char*);
 }
 
 int launch(String *args, int argc) {
