@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O0 -g3 -Isrc -Wall -Wextra -Wpedantic -Wconversion -Wdouble-promotion -Wno-unused-parameter -Wno-unused-function -Wno-sign-conversion -Wno-switch -fsanitize=undefined -fsanitize-trap
+CFLAGS = -L../../lib -O0 -g3 -Isrc -Wall -Wextra -Wpedantic -Wconversion -Wdouble-promotion -Wno-unused-parameter -Wno-unused-function -Wno-sign-conversion -Wno-switch -fsanitize=undefined -fsanitize-trap
 
 BUILD_DIR = build
 SRC_DIR = src
