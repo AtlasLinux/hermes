@@ -3,73 +3,57 @@
 #include <string.h>
 #include <unistd.h>
 
-const char* name = "hermes";
+const char *name = "hermes";
 struct termios orig_termios;
 
 static char PROMPT[MAX_LINE] = "\r$ ";
 
-void load_config(const char *path) {
+void load_config(const char *path)
+{
     FILE *file = fopen(path, "r");
-    if (!file) {
+    if (!file)
+    {
         fprintf(stderr, "Failed to open config file: %s: %s\n", path, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     char line[MAX_LINE];
-    while (fgets(line, sizeof(line), file)) {
+    while (fgets(line, sizeof(line), file))
+    {
         line[strcspn(line, "\r\n")] = '\0';
 
-        if (line[0]=='\0' || line[0]=='#') continue;
+        if (line[0] == '\0' || line[0] == '#')
+            continue;
         char *eq = strchr(line, '=');
-        if (!eq) continue;
+        if (!eq)
+            continue;
 
         *eq = '\0';
         char *key = line;
         char *val = eq + 1;
 
-        if (strcmp(key, "PROMPT") == 0) {
-            strncat(PROMPT, val, MAX_LINE-1);
+        if (strcmp(key, "PROMPT") == 0)
+        {
+            strncat(PROMPT, val, MAX_LINE - 1);
         }
     }
     fclose(file);
 }
 
-char* builtin_str[] = {
-    "cd",
-    "exit",
-    "echo",
-    "export",
-    "help",
-    "clear",
-    "fish"
-};
-
-int (*builtin_func[]) (String*) = {
-    &builtin_cd,
-    &builtin_exit,
-    &builtin_echo,
-    &builtin_export,
-    &builtin_help,
-    &builtin_clear,
-    &builtin_fish
-};
-
-int num_builtins(void) {
-    return sizeof(builtin_str) / sizeof(char*);
-}
-
-void disableRawMode(void) {
+void disableRawMode(void)
+{
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
 
-void enableRawMode(void) {
+void enableRawMode(void)
+{
     tcgetattr(STDIN_FILENO, &orig_termios);
     atexit(disableRawMode);
 
     struct termios raw = orig_termios;
     raw.c_lflag &= ~(ECHO | ICANON | ISIG);
-    raw.c_iflag &= ~(IXON | ICRNL);        
-    raw.c_oflag &= ~(OPOST);               
+    raw.c_iflag &= ~(IXON | ICRNL);
+    raw.c_oflag &= ~(OPOST);
 
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
@@ -77,10 +61,12 @@ void enableRawMode(void) {
 #include <limits.h>
 #include <sys/stat.h>
 
-String handle_tab(String buffer) {
+String handle_tab(String buffer)
+{
     int cap = 16, count = 0;
     String *matches = malloc(cap * sizeof(*matches));
-    if (!matches) {
+    if (!matches)
+    {
         perror(name);
         exit(EXIT_FAILURE);
     }
@@ -103,14 +89,19 @@ String handle_tab(String buffer) {
 
     int first_token = !last_space;
 
-    if (first_token) {
+    if (first_token)
+    {
         // Complete builtins + executables in PATH
-        for (int b = 0; b < num_builtins(); b++) {
-            if (strncmp(builtin_str[b], token_start, token_len) == 0) {
-                if (count == cap) {
+        for (int b = 0; b < builtin_str_count; b++)
+        {
+            if (strncmp(builtin_str[b], token_start, token_len) == 0)
+            {
+                if (count == cap)
+                {
                     cap *= 2;
                     matches = realloc(matches, cap * sizeof(*matches));
-                    if (!matches) {
+                    if (!matches)
+                    {
                         perror(name);
                         exit(EXIT_FAILURE);
                     }
@@ -121,27 +112,44 @@ String handle_tab(String buffer) {
         }
 
         char *path_env = getenv("PATH");
-        if (path_env) {
+        if (path_env)
+        {
             char *path_copy = strdup(path_env);
-            if (!path_copy) { perror(name); exit(EXIT_FAILURE); }
+            if (!path_copy)
+            {
+                perror(name);
+                exit(EXIT_FAILURE);
+            }
 
-            for (char *dirp = strtok(path_copy, ":"); dirp; dirp = strtok(NULL, ":")) {
+            for (char *dirp = strtok(path_copy, ":"); dirp; dirp = strtok(NULL, ":"))
+            {
                 DIR *d = opendir(dirp);
-                if (!d) continue;
+                if (!d)
+                    continue;
 
                 struct dirent *de;
-                while ((de = readdir(d)) != NULL) {
+                while ((de = readdir(d)) != NULL)
+                {
                     if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
                         continue;
 
-                    if (strncmp(de->d_name, token_start, token_len) == 0) {
+                    if (strncmp(de->d_name, token_start, token_len) == 0)
+                    {
                         char fullpath[PATH_MAX];
                         snprintf(fullpath, sizeof(fullpath), "%s/%s", dirp, de->d_name);
-                        if (access(fullpath, X_OK) == 0) {
-                            if (count == cap) {
+                        if (access(fullpath, X_OK) == 0)
+                        {
+                            if (count == cap)
+                            {
                                 cap *= 2;
                                 matches = realloc(matches, cap * sizeof(*matches));
-                                if (!matches) { perror(name); closedir(d); free(path_copy); exit(EXIT_FAILURE); }
+                                if (!matches)
+                                {
+                                    perror(name);
+                                    closedir(d);
+                                    free(path_copy);
+                                    exit(EXIT_FAILURE);
+                                }
                             }
                             matches[count].chars = strdup(de->d_name);
                             count++;
@@ -152,39 +160,55 @@ String handle_tab(String buffer) {
             }
             free(path_copy);
         }
-    } else {
+    }
+    else
+    {
         // Complete filenames / directories in CWD
         DIR *d = opendir(".");
-        if (d) {
+        if (d)
+        {
             struct dirent *de;
-            while ((de = readdir(d)) != NULL) {
+            while ((de = readdir(d)) != NULL)
+            {
                 if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
                     continue;
 
-                if (strncmp(de->d_name, token_start, token_len) == 0) {
+                if (strncmp(de->d_name, token_start, token_len) == 0)
+                {
                     char fullpath[PATH_MAX];
                     snprintf(fullpath, sizeof(fullpath), "./%s", de->d_name);
 
                     struct stat sb;
-                    if (stat(fullpath, &sb) == -1) continue;
+                    if (stat(fullpath, &sb) == -1)
+                        continue;
 
-                    if (complete_dirs_only && !S_ISDIR(sb.st_mode)) continue;
+                    if (complete_dirs_only && !S_ISDIR(sb.st_mode))
+                        continue;
 
-                    if (count == cap) {
+                    if (count == cap)
+                    {
                         cap *= 2;
                         matches = realloc(matches, cap * sizeof(*matches));
-                        if (!matches) { perror(name); closedir(d); exit(EXIT_FAILURE); }
+                        if (!matches)
+                        {
+                            perror(name);
+                            closedir(d);
+                            exit(EXIT_FAILURE);
+                        }
                     }
 
                     // add trailing / if directory
-                    if (S_ISDIR(sb.st_mode)) {
+                    if (S_ISDIR(sb.st_mode))
+                    {
                         size_t len = strlen(de->d_name);
                         char *with_slash = malloc(len + 2);
                         strcpy(with_slash, de->d_name);
                         with_slash[len] = '/';
-                        with_slash[len+1] = '\0';
+                        with_slash[len + 1] = '\0';
                         matches[count].chars = with_slash;
-                    } else {
+                    }
+                    else
+                    {
                         matches[count].chars = strdup(de->d_name);
                     }
                     count++;
@@ -194,7 +218,8 @@ String handle_tab(String buffer) {
         }
     }
 
-    if (count == 1) {
+    if (count == 1)
+    {
         // Replace token in buffer
         size_t pre_len = token_start - buffer.chars;
         size_t new_len = pre_len + strlen(matches[0].chars);
@@ -205,103 +230,123 @@ String handle_tab(String buffer) {
 
         free(buffer.chars);
         buffer.chars = new_buf;
-        buffer.len = new_len;
-    } else if (count > 1) {
-        for (int i = 0; i < count; i++) {
+        buffer.len = (int)new_len;
+    }
+    else if (count > 1)
+    {
+        for (int i = 0; i < count; i++)
+        {
             printf("%s\t", matches[i].chars);
         }
     }
 
-    for (int i = 0; i < count; i++) free(matches[i].chars);
+    for (int i = 0; i < count; i++)
+        free(matches[i].chars);
     free(matches);
     fflush(stdout);
     return buffer;
 }
 
-String read_line(void) {
+String read_line(void)
+{
     chars_t c;
-    String buffer = { .chars = calloc(BUFFER_MAX_SIZE, sizeof(char)), .len = 0};
-    if (!buffer.chars) {
+    String buffer = {.chars = calloc(BUFFER_MAX_SIZE, sizeof(char)), .len = 0};
+    if (!buffer.chars)
+    {
         perror(name);
         exit(1);
     }
 
-    while (read(STDIN_FILENO, &c, 1) == 1 && c != ENTER) {
-        switch (c) {
-            case ESCAPE:
+    while (read(STDIN_FILENO, &c, 1) == 1 && c != ENTER)
+    {
+        switch (c)
+        {
+        case ESCAPE:
+            read(STDIN_FILENO, &c, 1);
+            switch (c)
+            {
+            case '[':
                 read(STDIN_FILENO, &c, 1);
-                switch (c) {
-                    case '[':
-                        read(STDIN_FILENO, &c, 1);
-                        switch (c) {
-                            case UP:
-                                printf("\033[A");
-                                fflush(stdout);
-                                break;
-                            case DOWN:
-                                printf("\033[B");
-                                fflush(stdout);
-                                break;
-                            case RIGHT:
-                                printf("\033[C");
-                                fflush(stdout);
-                                break;
-                            case LEFT:
-                                printf("\033[D");
-                                fflush(stdout);
-                                break;
-                        }
-                }
-                break;
-            case CTRL_D:
-                if (buffer.len == 0) {
-                    printf("\n\r");
-                    disableRawMode();
-                    exit(SIGINT);
-                }
-                break;
-            case BACKSPACE:
-                if (buffer.len > 0) {
-                    printf("\b \b");
+                switch (c)
+                {
+                case UP:
+                    printf("\033[A");
                     fflush(stdout);
-                    buffer.chars[--buffer.len] = '\0';
+                    break;
+                case DOWN:
+                    printf("\033[B");
+                    fflush(stdout);
+                    break;
+                case RIGHT:
+                    printf("\033[C");
+                    fflush(stdout);
+                    break;
+                case LEFT:
+                    printf("\033[D");
+                    fflush(stdout);
+                    break;
                 }
-                break;
-            case TAB:
-                buffer = handle_tab(buffer);
-                printf("\n\r%s%s", PROMPT, buffer.chars);
+            }
+            break;
+        case CTRL_D:
+            if (buffer.len == 0)
+            {
+                printf("\n\r");
+                disableRawMode();
+                exit(SIGINT);
+            }
+            break;
+        case BACKSPACE:
+            if (buffer.len > 0)
+            {
+                printf("\b \b");
                 fflush(stdout);
-                break;
-            default:
-                buffer.chars[buffer.len++] = (char)c;
-                printf("\r%s%s", PROMPT, buffer.chars);
-                fflush(stdout);
-                break;
+                buffer.chars[--buffer.len] = '\0';
+            }
+            break;
+        case TAB:
+            buffer = handle_tab(buffer);
+            printf("\n\r%s%s", PROMPT, buffer.chars);
+            fflush(stdout);
+            break;
+        default:
+            buffer.chars[buffer.len++] = (char)c;
+            printf("\r%s%s", PROMPT, buffer.chars);
+            fflush(stdout);
+            break;
         }
-        if (buffer.len >= BUFFER_MAX_SIZE - 1) break;
+        if (buffer.len >= BUFFER_MAX_SIZE - 1)
+            break;
     }
     buffer.chars[buffer.len] = '\0';
     return buffer;
 }
 
-int parse_line(String line, String **out) {
-    String token = { .chars = strtok(line.chars, PARSE_TOKEN_DELIM), .len = strlen(token.chars) };
+int parse_line(String line, String **out)
+{
+    char *token_str = strtok(line.chars, PARSE_TOKEN_DELIM);
+    String token = {.chars = token_str, .len = token_str ? (int)strlen(token_str) : 0};
     String *buffer = malloc(sizeof(String) * BUFFER_MAX_SIZE);
-    if (!buffer) {
+    if (!buffer)
+    {
         perror(name);
         exit(1);
     }
     int i = 0;
 
-    while (token.chars != NULL) {
-        switch (token.chars[0]) {
-            case '$':
-                token.chars = getenv(token.chars + 1);
-                break;
+    while (token.chars != NULL)
+    {
+        switch (token.chars[0])
+        {
+        case '$':
+            token.chars = getenv(token.chars + 1);
+            break;
         }
         buffer[i].chars = token.chars;
         buffer[i].len = token.len;
-        token.chars = strtok(NULL, PARSE_TOKEN_DELIM);
+        token_str = strtok(NULL, PARSE_TOKEN_DELIM);
+        token.chars = token_str;
+        token.len = token_str ? (int)strlen(token_str) : 0;
         i++;
     }
 
@@ -309,82 +354,116 @@ int parse_line(String line, String **out) {
     return i;
 }
 
-char **to_argv(String *args, int count) {
+char **to_argv(String *args, int count)
+{
     char **argv = malloc((count + 1) * sizeof(char *));
-    if (!argv) {
+    if (!argv)
+    {
         perror(name);
         exit(1);
     }
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         argv[i] = args[i].chars;
     }
     argv[count] = NULL;
     return argv;
 }
 
-int launch(String *args, int argc) {
-    pid_t pid, wpid;
-    int status;
-
+int launch(String *args, int argc)
+{
+    pid_t pid;
     pid = fork();
-    if (pid == 0) {
+    if (pid == 0)
+    {
         char **argv = to_argv(args, argc);
-        if (execvp(argv[0], argv) == -1) {
+        if (execvp(argv[0], argv) == -1)
+        {
             perror(name);
         }
         exit(EXIT_FAILURE);
-    } else if (pid < 0) {
+    }
+    else if (pid < 0)
+    {
         perror(name);
-    } else {
-        do {
-            wpid = waitpid(pid, &status, WUNTRACED);
-        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    }
+    else
+    {
+        if (waitpid(pid, NULL, 0) == -1)
+        {
+            perror("waitpid");
+        }
     }
 
     return EXIT_FAILURE;
 }
 
-int execute(String* args, int argc) {
-    if (args[0].chars == NULL) {
+int execute(String *args, int argc)
+{
+    if (args[0].chars == NULL || argc == 0)
+    {
         return 1;
     }
 
-    for (int i = 0; i < num_builtins(); i++) {
-        if (strcmp(args[0].chars, builtin_str[i]) == 0) {
-            return (*builtin_func[i])(args);
+    for (int i = 0; i < builtin_str_count; i++)
+    {
+        if (strcmp(args[0].chars, builtin_str[i]) == 0)
+        {
+            // For builtin commands, a proper NULL-terminated array is needed
+            String *cmd_args = malloc((argc + 1) * sizeof(String));
+            if (!cmd_args)
+            {
+                return 1;
+            }
+
+            for (int j = 0; j < argc; j++)
+            {
+                cmd_args[j] = args[j];
+            }
+            cmd_args[argc].chars = NULL;
+
+            int result = (*builtin_func[i])(cmd_args);
+            free(cmd_args);
+            return result;
         }
     }
 
     return launch(args, argc);
 }
 
-int main(int argc, char** argv) {
-    if (access(CONFIG_FILE, F_OK) == 0) {
+int main(int argc, char **argv)
+{
+    if (access(CONFIG_FILE, F_OK) == 0)
+    {
         load_config(CONFIG_FILE);
     }
 
     name = argv[0];
 
-    int status;
     printf("\x1b[2J");
-    while (true) {
-	printf("\x1b[H\x1b[90B"); fflush(stdout);
+    while (true)
+    {
+        printf("\x1b[H\x1b[90B");
+        fflush(stdout);
 
-        printf(PROMPT);
+        printf("%s", PROMPT);
         fflush(stdout);
 
         enableRawMode();
 
         String line = read_line();
 
+        append_to_history(line.chars);
+
         printf("\x1b[2J\x1b[H");
         fflush(stdout);
 
         String *args;
         int argc = parse_line(line, &args);
-        if (argc > 0) {
+        if (argc > 0)
+        {
             disableRawMode();
-            status = execute(args, argc);
+            execute(args, argc);
         }
 
         free(line.chars);

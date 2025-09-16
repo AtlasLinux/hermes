@@ -3,12 +3,20 @@
 
 #include "globals.h"
 
-int builtin_export(String* args);
-int builtin_exit(String* args);
-int builtin_echo(String* args);
-int builtin_cd(String* args);
-int builtin_help(String* args);
-int builtin_clear(String* args);
-int builtin_fish(String* args);
+typedef int (*builtin_function)(String *);
+
+extern char *builtin_str[];
+extern const int builtin_str_count;
+extern builtin_function builtin_func[];
+
+int builtin_export(String *args);
+int builtin_exit(String *args);
+int builtin_echo(String *args);
+int builtin_cd(String *args);
+int builtin_help(String *args);
+int builtin_clear(String *args);
+int builtin_fish(String *args);
+int builtin_history(String *args);
+int append_to_history(const char *command);
 
 #endif
