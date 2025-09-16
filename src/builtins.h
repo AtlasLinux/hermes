@@ -3,6 +3,12 @@
 
 #include "globals.h"
 
+typedef int (*builtin_function)(String *);
+
+extern char *builtin_str[];
+extern const int builtin_str_count;
+extern builtin_function builtin_func[];
+
 int builtin_export(String *args);
 int builtin_exit(String *args);
 int builtin_echo(String *args);

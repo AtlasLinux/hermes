@@ -40,31 +40,6 @@ void load_config(const char *path)
     fclose(file);
 }
 
-char *builtin_str[] = {
-    "cd",
-    "exit",
-    "echo",
-    "export",
-    "help",
-    "clear",
-    "fish",
-    "history"};
-
-int (*builtin_func[])(String *) = {
-    &builtin_cd,
-    &builtin_exit,
-    &builtin_echo,
-    &builtin_export,
-    &builtin_help,
-    &builtin_clear,
-    &builtin_fish,
-    &builtin_history};
-
-int num_builtins(void)
-{
-    return sizeof(builtin_str) / sizeof(char *);
-}
-
 void disableRawMode(void)
 {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
@@ -117,7 +92,7 @@ String handle_tab(String buffer)
     if (first_token)
     {
         // Complete builtins + executables in PATH
-        for (int b = 0; b < num_builtins(); b++)
+        for (int b = 0; b < builtin_str_count; b++)
         {
             if (strncmp(builtin_str[b], token_start, token_len) == 0)
             {
@@ -255,7 +230,7 @@ String handle_tab(String buffer)
 
         free(buffer.chars);
         buffer.chars = new_buf;
-        buffer.len = new_len;
+        buffer.len = (int)new_len;
     }
     else if (count > 1)
     {
@@ -350,7 +325,7 @@ String read_line(void)
 int parse_line(String line, String **out)
 {
     char *token_str = strtok(line.chars, PARSE_TOKEN_DELIM);
-    String token = {.chars = token_str, .len = token_str ? strlen(token_str) : 0};
+    String token = {.chars = token_str, .len = token_str ? (int)strlen(token_str) : 0};
     String *buffer = malloc(sizeof(String) * BUFFER_MAX_SIZE);
     if (!buffer)
     {
@@ -371,7 +346,7 @@ int parse_line(String line, String **out)
         buffer[i].len = token.len;
         token_str = strtok(NULL, PARSE_TOKEN_DELIM);
         token.chars = token_str;
-        token.len = token_str ? strlen(token_str) : 0;
+        token.len = token_str ? (int)strlen(token_str) : 0;
         i++;
     }
 
@@ -397,9 +372,7 @@ char **to_argv(String *args, int count)
 
 int launch(String *args, int argc)
 {
-    pid_t pid, wpid;
-    int status;
-
+    pid_t pid;
     pid = fork();
     if (pid == 0)
     {
@@ -416,10 +389,10 @@ int launch(String *args, int argc)
     }
     else
     {
-        do
+        if (waitpid(pid, NULL, 0) == -1)
         {
-            wpid = waitpid(pid, &status, WUNTRACED);
-        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+            perror("waitpid");
+        }
     }
 
     return EXIT_FAILURE;
@@ -432,40 +405,29 @@ int execute(String *args, int argc)
         return 1;
     }
 
-    // Make a copy of the command name for comparison
-    char *cmd = strdup(args[0].chars);
-    if (!cmd)
+    for (int i = 0; i < builtin_str_count; i++)
     {
-        return 1;
-    }
-
-    for (int i = 0; i < num_builtins(); i++)
-    {
-        if (strcmp(cmd, builtin_str[i]) == 0)
+        if (strcmp(args[0].chars, builtin_str[i]) == 0)
         {
-            // For builtin commands, we need to create a proper NULL-terminated array
+            // For builtin commands, a proper NULL-terminated array is needed
             String *cmd_args = malloc((argc + 1) * sizeof(String));
             if (!cmd_args)
             {
-                free(cmd);
                 return 1;
             }
 
-            // Copy the arguments
             for (int j = 0; j < argc; j++)
             {
                 cmd_args[j] = args[j];
             }
-            cmd_args[argc].chars = NULL; // NULL-terminate the array
+            cmd_args[argc].chars = NULL;
 
             int result = (*builtin_func[i])(cmd_args);
             free(cmd_args);
-            free(cmd);
             return result;
         }
     }
 
-    free(cmd);
     return launch(args, argc);
 }
 
@@ -478,7 +440,6 @@ int main(int argc, char **argv)
 
     name = argv[0];
 
-    int status;
     printf("\x1b[2J");
     while (true)
     {
@@ -502,7 +463,7 @@ int main(int argc, char **argv)
         if (argc > 0)
         {
             disableRawMode();
-            status = execute(args, argc);
+            execute(args, argc);
         }
 
         free(line.chars);
