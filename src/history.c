@@ -314,24 +314,28 @@ static char **tokenize_args(const char *str, int *token_count)
 
 int builtin_history(String *args)
 {
-	if (!args)
+	if (!args || !args[0].chars)
 		return HERMES_FAILURE;
 
-	// Skip the command name (args[0])
-	args++;
-
-	// Count non-NULL arguments
+	// Count non-NULL arguments first
 	int arg_count = 0;
 	while (args[arg_count].chars != NULL)
 	{
 		arg_count++;
 	}
 
+	// Skip the command name (args[0]) only if it's not the only argument
+	if (arg_count > 0 && strcmp(args[0].chars, "history") == 0)
+	{
+		args++;
+		arg_count--;
+	}
+
 	// Parse arguments
 	int delete_mode = 0;
 	int start_id = 0, end_id = 0;
 	int range_mode = 0;
-	char **filters = NULL;
+	const char **filters = NULL;
 	int filter_count = 0;
 
 	// Handle clear command (no other arguments allowed)
@@ -383,7 +387,7 @@ int builtin_history(String *args)
 		// Remaining arguments are filters
 		if (arg_count > 0)
 		{
-			filters = malloc(arg_count * sizeof(char *));
+			filters = malloc(arg_count * sizeof(const char *));
 			for (int i = 0; i < arg_count; i++)
 			{
 				filters[i] = args[i].chars;
@@ -399,7 +403,7 @@ int builtin_history(String *args)
 	// Handle delete mode
 	if (delete_mode)
 	{
-		int result = delete_entries(&entries, &count, (const char **)filters, filter_count, start_id, end_id);
+		int result = delete_entries(&entries, &count, filters, filter_count, start_id, end_id);
 		free_history(entries, count);
 		if (filters)
 			free(filters);
@@ -417,7 +421,21 @@ int builtin_history(String *args)
 	}
 	else if (filter_count > 0)
 	{
-		print_history(entries, count, (const char **)filters, filter_count, 0, 0);
+		// Convert String array to const char* array for print_history
+		const char **filter_array = malloc(filter_count * sizeof(const char *));
+		if (!filter_array)
+		{
+			free_history(entries, count);
+			return HERMES_FAILURE;
+		}
+
+		for (int i = 0; i < filter_count; i++)
+		{
+			filter_array[i] = args[i].chars;
+		}
+
+		print_history(entries, count, filter_array, filter_count, 0, 0);
+		free(filter_array);
 	}
 	else
 	{

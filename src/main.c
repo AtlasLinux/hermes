@@ -427,19 +427,45 @@ int launch(String *args, int argc)
 
 int execute(String *args, int argc)
 {
-    if (args[0].chars == NULL)
+    if (args[0].chars == NULL || argc == 0)
+    {
+        return 1;
+    }
+
+    // Make a copy of the command name for comparison
+    char *cmd = strdup(args[0].chars);
+    if (!cmd)
     {
         return 1;
     }
 
     for (int i = 0; i < num_builtins(); i++)
     {
-        if (strcmp(args[0].chars, builtin_str[i]) == 0)
+        if (strcmp(cmd, builtin_str[i]) == 0)
         {
-            return (*builtin_func[i])(args);
+            // For builtin commands, we need to create a proper NULL-terminated array
+            String *cmd_args = malloc((argc + 1) * sizeof(String));
+            if (!cmd_args)
+            {
+                free(cmd);
+                return 1;
+            }
+
+            // Copy the arguments
+            for (int j = 0; j < argc; j++)
+            {
+                cmd_args[j] = args[j];
+            }
+            cmd_args[argc].chars = NULL; // NULL-terminate the array
+
+            int result = (*builtin_func[i])(cmd_args);
+            free(cmd_args);
+            free(cmd);
+            return result;
         }
     }
 
+    free(cmd);
     return launch(args, argc);
 }
 
