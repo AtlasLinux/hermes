@@ -20,7 +20,8 @@ builtin_function builtin_func[] = {
     &builtin_help,
     &builtin_clear,
     &builtin_fish,
-    &builtin_history};
+    &builtin_history
+};
 
 int builtin_export(String *args)
 {
