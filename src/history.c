@@ -312,6 +312,25 @@ static char **tokenize_args(const char *str, int *token_count)
 	return tokens;
 }
 
+// Display help information for history command
+static void show_history_help(void)
+{
+	printf("Usage: history [OPTIONS] [FILTERS]\n");
+	printf("Display or manipulate command history.\n\n");
+	printf("Options:\n");
+	printf("  help                 Show this help message\n");
+	printf("  --clear              Clear the entire command history\n");
+	printf("  --delete [ID] [END]  Delete specific history entries by ID or range\n");
+	printf("  [ID] [END]          Show entries from ID to END (if specified)\n");
+	printf("\nExamples:\n");
+	printf("  history              Show all history entries\n");
+	printf("  history 5            Show history entry with ID 5\n");
+	printf("  history 10 20       Show history entries from 10 to 20\n");
+	printf("  history grep        Show entries containing 'grep'\n");
+	printf("  history --delete 5  Delete entry with ID 5\n");
+	printf("  history --clear     Clear all history\n");
+}
+
 int builtin_history(String *args)
 {
 	if (!args || !args[0].chars)
@@ -329,6 +348,13 @@ int builtin_history(String *args)
 	{
 		args++;
 		arg_count--;
+	}
+
+	// Handle help command
+	if (arg_count > 0 && strcmp(args[0].chars, "help") == 0)
+	{
+		show_history_help();
+		return HERMES_SUCCESS;
 	}
 
 	// Parse arguments
