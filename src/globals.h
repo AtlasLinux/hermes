@@ -19,14 +19,15 @@
 #define HERMES_FAILURE 0
 #define CONFIG_FILE "/home/gingrspacecadet/hermes.conf"
 
-extern const char* name;
+extern const char *name;
 
 typedef const enum sizes {
     BUFFER_MAX_SIZE = 1024,
     MAX_LINE = 512,
 } sizes_t;
 
-typedef enum chars {
+typedef enum chars
+{
     CTRL_D = 4,
     TAB = 9,
     ENTER = 13,
@@ -38,8 +39,9 @@ typedef enum chars {
     BACKSPACE = 127,
 } chars_t;
 
-typedef struct String {
-    char* chars;
+typedef struct String
+{
+    char *chars;
     int len;
 } String;
 
