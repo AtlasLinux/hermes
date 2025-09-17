@@ -19,4 +19,11 @@ int builtin_fish(String *args);
 int builtin_history(String *args);
 int append_to_history(const char *command);
 
+typedef struct HistoryEntry {
+    int id;
+    char *command;
+} HistoryEntry;
+
+int read_history(HistoryEntry **entries);
+
 #endif

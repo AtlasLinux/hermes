@@ -6,12 +6,6 @@
 #define MAX_HISTORY_LINES 1000
 #define MAX_LINE 1024
 
-typedef struct HistoryEntry
-{
-    int id;
-    char *command;
-} HistoryEntry;
-
 // Safe function to get history file path
 static inline char *history_file(void) {
     const char *home = getenv("HOME");
@@ -41,7 +35,7 @@ static char *trim_whitespace(char *str) {
 }
 
 // Read history
-static int read_history(HistoryEntry **entries) {
+int read_history(HistoryEntry **entries) {
     char *hf = history_file();
     if (!hf) return 0;
     FILE *file = fopen(hf, "r");

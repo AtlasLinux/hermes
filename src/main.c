@@ -247,78 +247,103 @@ String handle_tab(String buffer)
     return buffer;
 }
 
-String read_line(void)
+String read_line(HistoryEntry *history, int history_count)
 {
-    chars_t c;
-    String buffer = {.chars = calloc(BUFFER_MAX_SIZE, sizeof(char)), .len = 0};
+    String buffer = {.chars = calloc(BUFFER_MAX_SIZE, 1), .len = 0};
     if (!buffer.chars)
     {
-        perror(name);
+        perror("read_line");
         exit(1);
     }
 
+    int cursor = 0;            // current cursor position in buffer
+    int history_index = history_count; // start at "after last entry"
+    chars_t c;
+
     while (read(STDIN_FILENO, &c, 1) == 1 && c != ENTER)
     {
-        switch (c)
+        if (c == ESCAPE)
         {
-        case ESCAPE:
             read(STDIN_FILENO, &c, 1);
-            switch (c)
+            if (c == '[')
             {
-            case '[':
                 read(STDIN_FILENO, &c, 1);
                 switch (c)
                 {
-                case UP:
-                    printf("\033[A");
-                    fflush(stdout);
-                    break;
-                case DOWN:
-                    printf("\033[B");
-                    fflush(stdout);
-                    break;
-                case RIGHT:
-                    printf("\033[C");
-                    fflush(stdout);
-                    break;
-                case LEFT:
-                    printf("\033[D");
-                    fflush(stdout);
-                    break;
+                    case 'A': // UP
+                        if (history_count == 0) break;
+                        if (history_index > 0) history_index--;
+                        else break;
+                        buffer.len = snprintf(buffer.chars, BUFFER_MAX_SIZE, "%s", history[history_index].command);
+                        cursor = buffer.len;
+                        break;
+
+                    case 'B': // DOWN
+                        if (history_count == 0) break;
+                        if (history_index < history_count - 1)
+                        {
+                            history_index++;
+                            buffer.len = snprintf(buffer.chars, BUFFER_MAX_SIZE, "%s", history[history_index].command);
+                        }
+                        else
+                        {
+                            history_index = history_count;
+                            buffer.len = 0;
+                            buffer.chars[0] = '\0';
+                        }
+                        cursor = buffer.len;
+                        break;
+
+                    case 'C': // RIGHT
+                        if (cursor < buffer.len) cursor++;
+                        break;
+
+                    case 'D': // LEFT
+                        if (cursor > 0) cursor--;
+                        break;
                 }
             }
-            break;
-        case CTRL_D:
+        }
+        else if (c == BACKSPACE || c == 127)
+        {
+            if (cursor > 0)
+            {
+                memmove(&buffer.chars[cursor - 1], &buffer.chars[cursor], buffer.len - cursor);
+                buffer.len--;
+                buffer.chars[buffer.len] = '\0';
+                cursor--;
+            }
+        }
+        else if (c == CTRL_D)
+        {
             if (buffer.len == 0)
             {
-                printf("\n\r");
+                printf("\n");
                 disableRawMode();
                 exit(SIGINT);
             }
-            break;
-        case BACKSPACE:
-            if (buffer.len > 0)
-            {
-                printf("\b \b");
-                fflush(stdout);
-                buffer.chars[--buffer.len] = '\0';
-            }
-            break;
-        case TAB:
-            buffer = handle_tab(buffer);
-            printf("\n\r%s%s", PROMPT, buffer.chars);
-            fflush(stdout);
-            break;
-        default:
-            buffer.chars[buffer.len++] = (char)c;
-            printf("\r%s%s", PROMPT, buffer.chars);
-            fflush(stdout);
-            break;
         }
-        if (buffer.len >= BUFFER_MAX_SIZE - 1)
-            break;
+        else
+        {
+            if (buffer.len < BUFFER_MAX_SIZE - 1)
+            {
+                memmove(&buffer.chars[cursor + 1], &buffer.chars[cursor], buffer.len - cursor);
+                buffer.chars[cursor] = (char)c;
+                cursor++;
+                buffer.len++;
+            }
+        }
+
+        // redraw line
+        printf("\r%s%s\033[K", PROMPT, buffer.chars);
+        // move cursor to correct position
+        printf("\r%s", PROMPT);
+        if (cursor > 0) printf("\033[%dC", cursor);
+        fflush(stdout);
     }
+
     buffer.chars[buffer.len] = '\0';
+    printf("\n");
     return buffer;
 }
 
@@ -431,16 +456,18 @@ int execute(String *args, int argc)
 int main(int argc, char **argv)
 {
     if (access(CONFIG_FILE, F_OK) == 0)
-    {
         load_config(CONFIG_FILE);
-    }
 
     name = argv[0];
 
-    printf("\x1b[2J");
+    // Load history
+    HistoryEntry *history = NULL;
+    int history_count = read_history(&history);
+
+    printf("\x1b[2J"); // clear screen
     while (true)
     {
-        printf("\x1b[H\x1b[90B");
+        printf("\x1b[H\x1b[90B"); // move cursor
         fflush(stdout);
 
         printf("%s", PROMPT);
@@ -448,11 +475,21 @@ int main(int argc, char **argv)
 
         enableRawMode();
 
-        String line = read_line();
+        // Pass the history buffer to the line reader
+        String line = read_line(history, history_count);
 
-        append_to_history(line.chars);
+        // Append new line to history
+        if (line.len > 0)
+        {
+            append_to_history(line.chars);
 
-        printf("\x1b[2J\x1b[H");
+            // Add to in-memory array for immediate navigation
+            history = realloc(history, (history_count + 1) * sizeof(HistoryEntry));
+            history[history_count].command = strdup(line.chars);
+            history_count++;
+        }
+
+        printf("\x1b[2J\x1b[H"); // clear screen again
         fflush(stdout);
 
         String *args;
@@ -466,6 +503,11 @@ int main(int argc, char **argv)
         free(line.chars);
         free(args);
     }
+
+    // Cleanup
+    for (int i = 0; i < history_count; i++)
+        free(history[i].command);
+    free(history);
 
     return 0;
 }
