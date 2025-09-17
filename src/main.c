@@ -243,6 +243,7 @@ String handle_tab(String buffer)
     for (int i = 0; i < count; i++)
         free(matches[i].chars);
     free(matches);
+    printf("\n");
     fflush(stdout);
     return buffer;
 }
@@ -322,6 +323,10 @@ String read_line(HistoryEntry *history, int history_count)
                 disableRawMode();
                 exit(SIGINT);
             }
+        }
+        else if (c == TAB) {
+            buffer = handle_tab(buffer);
+            cursor = buffer.len;
         }
         else
         {
