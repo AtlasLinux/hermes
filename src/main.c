@@ -389,10 +389,7 @@ int launch(String *args, int argc)
     }
     else
     {
-        if (waitpid(pid, NULL, 0) == -1)
-        {
-            perror("waitpid");
-        }
+        waitpid(pid, NULL, 0);
     }
 
     return EXIT_FAILURE;
