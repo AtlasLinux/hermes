@@ -163,20 +163,35 @@ String handle_tab(String buffer)
     }
     else
     {
-        // Complete filenames / directories in CWD
-        DIR *d = opendir(".");
-        if (d)
-        {
+        // Split token_start into dir and base parts
+        char dirpart[PATH_MAX];
+        char basepart[PATH_MAX];
+
+        const char *slash = strrchr(token_start, '/');
+        if (slash) {
+            size_t dirlen = slash - token_start + 1; // include '/'
+            if (dirlen >= sizeof(dirpart))
+                dirlen = sizeof(dirpart) - 1;
+            memcpy(dirpart, token_start, dirlen);
+            dirpart[dirlen] = '\0';
+            strncpy(basepart, slash + 1, sizeof(basepart) - 1);
+            basepart[sizeof(basepart) - 1] = '\0';
+        } else {
+            strcpy(dirpart, "./"); // current dir
+            strncpy(basepart, token_start, sizeof(basepart) - 1);
+            basepart[sizeof(basepart) - 1] = '\0';
+        }
+
+        DIR *d = opendir(dirpart);
+        if (d) {
             struct dirent *de;
-            while ((de = readdir(d)) != NULL)
-            {
+            while ((de = readdir(d)) != NULL) {
                 if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
                     continue;
 
-                if (strncmp(de->d_name, token_start, token_len) == 0)
-                {
+                if (strncmp(de->d_name, basepart, strlen(basepart)) == 0) {
                     char fullpath[PATH_MAX];
-                    snprintf(fullpath, sizeof(fullpath), "./%s", de->d_name);
+                    snprintf(fullpath, sizeof(fullpath), "%s%s", dirpart, de->d_name);
 
                     struct stat sb;
                     if (stat(fullpath, &sb) == -1)
@@ -185,31 +200,27 @@ String handle_tab(String buffer)
                     if (complete_dirs_only && !S_ISDIR(sb.st_mode))
                         continue;
 
-                    if (count == cap)
-                    {
+                    if (count == cap) {
                         cap *= 2;
                         matches = realloc(matches, cap * sizeof(*matches));
-                        if (!matches)
-                        {
+                        if (!matches) {
                             perror(name);
                             closedir(d);
                             exit(EXIT_FAILURE);
                         }
                     }
 
-                    // add trailing / if directory
-                    if (S_ISDIR(sb.st_mode))
-                    {
-                        size_t len = strlen(de->d_name);
+                    // Build candidate including dirpart, add '/' if directory
+                    if (S_ISDIR(sb.st_mode)) {
+                        size_t len = strlen(dirpart) + strlen(de->d_name);
                         char *with_slash = malloc(len + 2);
-                        strcpy(with_slash, de->d_name);
-                        with_slash[len] = '/';
-                        with_slash[len + 1] = '\0';
+                        sprintf(with_slash, "%s%s/", dirpart, de->d_name);
                         matches[count].chars = with_slash;
-                    }
-                    else
-                    {
-                        matches[count].chars = strdup(de->d_name);
+                    } else {
+                        size_t len = strlen(dirpart) + strlen(de->d_name);
+                        char *cand = malloc(len + 1);
+                        sprintf(cand, "%s%s", dirpart, de->d_name);
+                        matches[count].chars = cand;
                     }
                     count++;
                 }
