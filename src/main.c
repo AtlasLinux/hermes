@@ -1,7 +1,9 @@
-#include "globals.h"
-#include "builtins.h"
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
+#include <sys/stat.h>
+#include "globals.h"
+#include "builtins.h"
 
 const char *name = "hermes";
 struct termios orig_termios;
@@ -53,13 +55,11 @@ void enableRawMode(void)
     struct termios raw = orig_termios;
     raw.c_lflag &= ~(ECHO | ICANON | ISIG);
     raw.c_iflag &= ~(IXON | ICRNL);
-    raw.c_oflag &= ~(OPOST);
+    // raw.c_oflag &= ~(OPOST);
 
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
-#include <limits.h>
-#include <sys/stat.h>
 
 String handle_tab(String buffer)
 {
