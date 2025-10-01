@@ -26,8 +26,7 @@ typedef const enum sizes {
     MAX_LINE = 512,
 } sizes_t;
 
-typedef enum chars
-{
+typedef enum chars {
     CTRL_D = 4,
     TAB = 9,
     ENTER = 13,
@@ -39,8 +38,7 @@ typedef enum chars
     BACKSPACE = 127,
 } chars_t;
 
-typedef struct String
-{
+typedef struct String {
     char *chars;
     int len;
 } String;
