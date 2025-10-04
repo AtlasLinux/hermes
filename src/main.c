@@ -20,7 +20,7 @@ static void die(const int code) {
 static void sigint_handler(int sig) {
     (void)sig;
     if (fg_pid > 0) {
-        /* send to the process group so all children in that group get it */
+        // send to the process group so all children in that group get it 
         kill(-fg_pid, SIGINT);
     }
 }
@@ -72,8 +72,6 @@ String handle_tab(String buffer) {
     if (!matches) {
         die(EXIT_FAILURE);
     }
-
-    printf("\n\r");
 
     // Determine current token
     char *last_space = strrchr(buffer.chars, ' ');
@@ -224,15 +222,16 @@ String handle_tab(String buffer) {
         buffer.chars = new_buf;
         buffer.len = (int)new_len;
     } else if (count > 1) {
+        printf("\n");
         for (int i = 0; i < count; i++) {
             printf("%s\t", matches[i].chars);
         }
+        printf("\n");
     }
 
     for (int i = 0; i < count; i++)
         free(matches[i].chars);
     free(matches);
-    printf("\n");
     fflush(stdout);
     return buffer;
 }
@@ -362,27 +361,27 @@ char **to_argv(String *args, int count) {
     return argv;
 }
 
-/* launch child in its own process group, wait robustly */
+// launch child in its own process group, wait robustly 
 int launch(String *args, int argc) {
     pid_t pid = fork();
     if (pid == 0) {
-        /* child: create new process group so signals can be targeted at the group */
+        // child: create new process group so signals can be targeted at the group 
         if (setpgid(0, 0) < 0) {
-            /* not fatal — continue */
+            // not fatal - continue 
         }
         char **argv = to_argv(args, argc);
         execvp(argv[0], argv);
 
-        /* exec failed: print error and exit _immediately_ without running parent's atexit handlers */
+        // exec failed: print error and exit _immediately_ without running parent's atexit handlers 
         perror(argv[0]);
-        _exit(127); /* common "command not found" code */
+        _exit(127); // common "command not found" code 
     } else if (pid < 0) {
         perror(name);
         return -1;
     } else {
-        /* parent: set child's pgid (best-effort) and wait */
+        // parent: set child's pgid (best-effort) and wait 
         if (setpgid(pid, pid) < 0 && errno != EACCES && errno != EPERM) {
-            /* ignore: some platforms may not allow, but it's best-effort */
+            // ignore: some platforms may not allow, but it's best-effort 
         }
 
         fg_pid = pid;
@@ -393,10 +392,10 @@ int launch(String *args, int argc) {
             w = waitpid(pid, &status, 0);
         } while (w == -1 && errno == EINTR);
 
-        /* reset fg pid regardless of wait result */
+        // reset fg pid regardless of wait result 
         fg_pid = -1;
 
-        /* optionally return child's exit status */
+        // optionally return child's exit status 
         if (w == -1) {
             return -1;
         }
