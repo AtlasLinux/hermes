@@ -10,7 +10,8 @@ struct termios orig_termios;
 
 static char PROMPT[MAX_LINE] = "\r$ ";
 
-static pid_t fg_pid = -1; // current foreground process
+static pid_t fg_pid = -1;        // current foreground process
+static pid_t shell_pgid = -1;    // shell's process group id
 
 static void die(const int code) {
     perror(name);
@@ -365,42 +366,71 @@ char **to_argv(String *args, int count) {
 int launch(String *args, int argc) {
     pid_t pid = fork();
     if (pid == 0) {
-        // child: create new process group so signals can be targeted at the group 
-        if (setpgid(0, 0) < 0) {
-            // not fatal - continue 
-        }
+        /* child */
+        if (setpgid(0, 0) < 0) { /* ignore errors - best effort */ }
+
+        /* Restore default signal handlers in child (optional, but good) */
+        signal(SIGINT, SIG_DFL);
+        signal(SIGQUIT, SIG_DFL);
+        signal(SIGTSTP, SIG_DFL);
+        signal(SIGTTIN, SIG_DFL);
+        signal(SIGTTOU, SIG_DFL);
+
         char **argv = to_argv(args, argc);
         execvp(argv[0], argv);
 
-        // exec failed: print error and exit _immediately_ without running parent's atexit handlers 
         perror(argv[0]);
-        _exit(127); // common "command not found" code 
+        _exit(127);
     } else if (pid < 0) {
         perror(name);
         return -1;
     } else {
-        // parent: set child's pgid (best-effort) and wait 
+        /* parent */
+        /* Ensure child's pgid is set (best-effort) */
         if (setpgid(pid, pid) < 0 && errno != EACCES && errno != EPERM) {
-            // ignore: some platforms may not allow, but it's best-effort 
+            /* ignore */
         }
 
         fg_pid = pid;
 
+        /* give terminal control to child process group */
+        /* ignore SIGTTOU/SIGTTIN while changing foreground pg */
+        void (*old_ttout)(int) = signal(SIGTTOU, SIG_IGN);
+        void (*old_ttin)(int)  = signal(SIGTTIN, SIG_IGN);
+
+        if (tcsetpgrp(STDIN_FILENO, pid) < 0) {
+            /* not fatal, but report in debug builds */
+            /* perror("tcsetpgrp"); */
+        }
+
+        /* restore signal handlers we changed */
+        signal(SIGTTOU, old_ttout);
+        signal(SIGTTIN, old_ttin);
+
         int status;
         pid_t w;
         do {
-            w = waitpid(pid, &status, 0);
+            w = waitpid(pid, &status, WUNTRACED);
         } while (w == -1 && errno == EINTR);
 
-        // reset fg pid regardless of wait result 
+        /* if child was stopped (SIGTSTP), consider job control handling here.
+           For now, if stopped, put it in background or track; simple shell
+           may just continue. */
+
+        /* give terminal back to shell */
+        /* ignore SIGTTOU while restoring */
+        old_ttout = signal(SIGTTOU, SIG_IGN);
+        if (tcsetpgrp(STDIN_FILENO, shell_pgid) < 0) {
+            /* perror("tcsetpgrp restore"); */
+        }
+        signal(SIGTTOU, old_ttout);
+
         fg_pid = -1;
 
-        // optionally return child's exit status 
-        if (w == -1) {
-            return -1;
-        }
+        if (w == -1) return -1;
         if (WIFEXITED(status)) return WEXITSTATUS(status);
         if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
+        if (WIFSTOPPED(status)) return 128 + WSTOPSIG(status);
         return -1;
     }
 }
@@ -444,6 +474,14 @@ int main(int argc, char **argv) {
     int history_count = read_history(&history);
 
     signal(SIGINT, sigint_handler); // enables SIGINT to kill child
+    /* in main(), after signal(SIGINT, sigint_handler); and before prompt loop */
+    shell_pgid = getpgrp();
+    /* attempt to ensure the shell is in its own process group (best-effort) */
+    if (setpgid(0, 0) < 0 && errno != EPERM && errno != EACCES) {
+        perror("setpgid(shell)");
+    }
+    /* Ensure the shell is foreground of the terminal (best-effort) */
+    tcsetpgrp(STDIN_FILENO, shell_pgid);
 
     chdir(getenv("HOME"));
 
